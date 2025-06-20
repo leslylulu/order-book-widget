@@ -5,9 +5,16 @@ export async function GET() {
   let price = 100;
 
   const push = async () => {
-    price += (Math.random() - 0.5);
-    await writer.write(`data: ${JSON.stringify({ price })}\n\n`);
-    setTimeout(push, 1000);
+    try{
+      price += (Math.random() - 0.5);
+      await writer.write(`data: ${JSON.stringify({ price })}\n\n`);
+      setTimeout(push, 1000);
+    }catch(err){
+      console.error("error", err)
+      try{
+        writer.close();
+      }catch{}
+    }
   };
   push();
 

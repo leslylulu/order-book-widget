@@ -25,3 +25,8 @@ order‑book‑widget/
 ├─ package.json
 └─ tsconfig.json
 ```
+
+# During development
+1. request /api/order-stream/ - 404
+`order‑stream`  vs `order-stream` is different
+
