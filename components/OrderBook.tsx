@@ -118,9 +118,12 @@ const BlinkingCell = styled(TableCell)`
 
 
 export default function OrderBook() {
+  const MAX_RECONNECT_ATTEMPTS = 10;
+
   const [connected, setConnected] = useState(false);
   const [records, setRecords] = useState<PriceRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [reconnectCount, setReconnectCount] = useState(0)
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -157,6 +160,7 @@ export default function OrderBook() {
       console.log('connection to server opened');
       setConnected(true);
       setLoading(false);
+      setReconnectCount(0);
     };
     eventSource.onmessage = (event) => {
       try{
@@ -174,11 +178,21 @@ export default function OrderBook() {
       eventSource.close();
 
       if(!reconnectTimeoutRef.current) {
-        reconnectTimeoutRef.current = setTimeout(() => {
-          console.log('reconnecting to server...');
-          reconnectTimeoutRef.current = null;
-          connect();
-        }, 3000);
+        if(reconnectCount < MAX_RECONNECT_ATTEMPTS){
+          const nextAttempt = reconnectCount + 1;
+          setReconnectCount(nextAttempt);
+
+          const delay = Math.min(1000 * Math.pow(2, nextAttempt - 1), 30000);
+
+          reconnectTimeoutRef.current = setTimeout(() => {
+            console.log('reconnecting to server...');
+            reconnectTimeoutRef.current = null;
+            connect();
+          }, delay);
+        }
+        else{
+          console.error(`failed to reconnect after ${MAX_RECONNECT_ATTEMPTS} attempts!`);
+        }
       }
     };
   }
@@ -206,10 +220,13 @@ export default function OrderBook() {
       
     {!connected && !loading && (
       <Alert
-        severity="error"
+        severity={reconnectCount < MAX_RECONNECT_ATTEMPTS ? "warning" : "error"}
         sx={{ mb: 2 }}
       >
-        Connection lost. Attempting to reconnect...
+        {reconnectCount < MAX_RECONNECT_ATTEMPTS
+          ? `Attempting to reconnect... (${reconnectCount}/${MAX_RECONNECT_ATTEMPTS})`
+          : `Maximum reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached!`
+        }
       </Alert>
     )}
 
