@@ -14,6 +14,7 @@ Display a live price ticker and rolling list of price updates from a mocked SSE 
 • Add a high‑/low‑water‑mark column, mini‑sparkline, etc.
 
 ## File tree
+```bash
 order‑book‑widget/
 ├─ app/
 │  ├─ api/
@@ -23,3 +24,4 @@ order‑book‑widget/
 ├─ jest.config.js
 ├─ package.json
 └─ tsconfig.json
+```

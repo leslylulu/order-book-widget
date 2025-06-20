@@ -6,5 +6,5 @@
    – clean up on unmount
 */
 export default function OrderBook() {
-  return null;
+  return <div>OrderBook</div>;
 }
