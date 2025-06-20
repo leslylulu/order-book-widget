@@ -1,7 +1,8 @@
 'use client';
 import { useState, useEffect, useRef } from "react";
-import { Paper, TableContainer, Typography, Table, TableBody, TableCell, TableHead, TableRow, useTheme, alpha } from "@mui/material";
+import { Paper, Alert, TableContainer, Typography, Table, TableBody, TableCell, TableHead, TableRow, Skeleton, alpha } from "@mui/material";
 import { tableCellClasses } from '@mui/material/TableCell';
+import { ArrowDropUp, ArrowDropDown } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 
 /* TODO:
@@ -58,9 +59,68 @@ const StyledTableRow = styled(TableRow)(({ theme }) => ({
 }));
 
 
+interface SideTypeBadgeProps {
+  side: Side;
+}
+
+const SideTypeBadge = styled(Typography, {
+  shouldForwardProp: (prop) => prop !== 'side',
+})<SideTypeBadgeProps>(({ theme, side }) => ({
+  display: 'inline-block',
+  border: '1px solid',
+  fontSize: "0.8rem",
+  borderRadius: theme.shape.borderRadius * 2,
+  padding: '0.2rem 0.5rem',
+  color: side === Side.Bid ? '#1976d2' : '#9c27b0',
+  backgroundColor: side === Side.Bid
+    ? alpha('#1976d2', 0.08)
+    : alpha('#9c27b0', 0.08),
+  borderColor: side === Side.Bid ? '#64b5f6' : '#ce93d8',
+}));
+
+const BlinkingCell = styled(TableCell)`
+  &.blink-green span {
+    display: inline-block;
+    animation: blinkGreenGlow 0.6s ease-in-out;
+  }
+
+  &.blink-red span {
+    display: inline-block;
+    animation: blinkRedGlow 0.6s ease-in-out;
+  }
+
+  @keyframes blinkGreenGlow {
+    0% {
+      color: #4caf50;
+      text-shadow: 0 0 8px rgba(76, 175, 80, 0.8);
+      transform: scale(1.15);
+    }
+    100% {
+      color: inherit;
+      text-shadow: none;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes blinkRedGlow {
+    0% {
+      color: #f44336;
+      text-shadow: 0 0 8px rgba(244, 67, 54, 0.8);
+      transform: scale(1.15);
+    }
+    100% {
+      color: inherit;
+      text-shadow: none;
+      transform: scale(1);
+    }
+  }
+`;
+
+
 export default function OrderBook() {
   const [connected, setConnected] = useState(false);
   const [records, setRecords] = useState<PriceRecord[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -89,12 +149,14 @@ export default function OrderBook() {
   }
 
   const connect = () => {
+    setLoading(true);
     const eventSource = new EventSource('/api/order-stream');
     eventSourceRef.current = eventSource;
 
     eventSource.onopen = () => {
       console.log('connection to server opened');
       setConnected(true);
+      setLoading(false);
     };
     eventSource.onmessage = (event) => {
       try{
@@ -108,6 +170,7 @@ export default function OrderBook() {
     eventSource.onerror = (error) => {
       console.error('eventsource error:', error);
       setConnected(false);
+      setLoading(false);
       eventSource.close();
 
       if(!reconnectTimeoutRef.current) {
@@ -137,14 +200,28 @@ export default function OrderBook() {
     sx={{ 
       margin: 'auto',
       m: 4,
-      borderRadius: '16px',
+      borderRadius: '1rem',
       boxShadow: 0
     }}>
+      
+    {!connected && !loading && (
+      <Alert
+        severity="error"
+        sx={{ mb: 2 }}
+      >
+        Connection lost. Attempting to reconnect...
+      </Alert>
+    )}
+
     <Typography variant="subtitle1" gutterBottom>
-      Last Price: <strong>{records[0]?.price?.toFixed(4) ?? '--'}</strong>
+      Last Price: <strong>{loading ? <Skeleton sx={{
+        display: "inline-block"
+      }} width={80}/> : records[0]?.price?.toFixed(4) ?? '--'}</strong>
     </Typography>
     
-    <TableContainer>
+    <TableContainer sx={{
+      boxShadow: '0px 3px 8px rgba(0, 0, 0, 0.1)',
+    }}>
       <Table aria-label="price table">
         <TableHead>
           <TableRow>
@@ -154,49 +231,59 @@ export default function OrderBook() {
           </TableRow>
         </TableHead>
         <TableBody>
-          {records.map((item, index) => (
-            <StyledTableRow key={index}>
-              <TableCell>{item.timestamp}</TableCell>
-              <TableCell>
-                <Typography
+          {
+            loading ? (
+              Array(10).fill(0).map((_, index) => (
+                <StyledTableRow key={`skeleton-${index}`}>
+                  <TableCell><Skeleton /></TableCell>
+                  <TableCell><Skeleton /></TableCell>
+                  <TableCell><Skeleton /></TableCell>
+                </StyledTableRow>
+              ))
+            ) : records.length > 0 ? records.map((item, index) => (
+              <StyledTableRow key={index}>
+                <TableCell>{item.timestamp}</TableCell>
+                <TableCell>
+                  <SideTypeBadge side={item.side}>
+                    {item.side}
+                  </SideTypeBadge>
+                </TableCell>
+                <BlinkingCell
+                  className={
+                    index === 0
+                      ? item.direction === PriceDirection.Up
+                        ? 'blink-green'
+                        : item.direction === PriceDirection.Down
+                          ? 'blink-red'
+                          : ''
+                      : ''
+                  }
                   sx={{
-                    display: 'inline-block',
-                    border: '1px solid',
-                    fontSize: "0.8rem",
                     color:
-                      item.side === Side.Bid
-                        ? '#1976d2'
-                        : '#9c27b0',
-                    bgcolor:
-                      item.side === Side.Bid
-                        ? alpha('#1976d2', 0.08)
-                        : alpha('#9c27b0', 0.08),
-                    borderColor:
-                      item.side === Side.Bid
-                        ? '#64b5f6'
-                        : '#ce93d8',
-                    borderRadius: 2,
-                    padding: '2px 6px',
+                      item.direction === PriceDirection.Up
+                        ? 'green'
+                        : item.direction === PriceDirection.Down
+                          ? 'red'
+                          : 'text.primary',
+                    fontWeight: item.direction !== PriceDirection.Same ? 'bold' : 'normal',
                   }}
                 >
-                  {item.side}
-                </Typography>
-              </TableCell>
-              <TableCell
-                sx={{
-                  color:
-                  item.direction === PriceDirection.Up
-                      ? 'green'
-                      : item.direction === PriceDirection.Down
-                      ? 'red'
-                      : 'text.primary',
-                  fontWeight: item.direction !== PriceDirection.Same ? 'bold' : 'normal',
-                }}
-              >
-                {item.price.toFixed(4)}
-              </TableCell>
-            </StyledTableRow>
-          ))}
+                  <span>
+                    {item.price.toFixed(4)}
+                    {item.direction === PriceDirection.Up && (
+                      <ArrowDropUp sx={{ color: 'inherit', ml: 0.5 }} />
+                    )}
+                    {item.direction === PriceDirection.Down && (
+                      <ArrowDropDown sx={{ color: 'inherit', ml: 0.5 }} />
+                    )}
+                  </span>
+                </BlinkingCell>
+
+              </StyledTableRow>
+            )) : <TableRow>
+                <TableCell colSpan={3} align="center">NoData</TableCell>
+              </TableRow>
+          }
         </TableBody>
       </Table>
     </TableContainer>
