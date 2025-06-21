@@ -7,7 +7,7 @@ interface EventSourceMessageEvent extends Event {
 
 type EventHandler = ((event: Event) => void) | null;
 
-class MockEventSource implements EventSource {
+class MockEventSource {
 	static readonly CONNECTING = 0;
 	static readonly OPEN = 1;
 	static readonly CLOSED = 2;
@@ -33,12 +33,14 @@ class MockEventSource implements EventSource {
 
 
 	close = jest.fn(() => {
+		console.log('close() called');
 		this.readyState = this.CLOSED;
 		// for testing cleanup behavior
 		this.dispatchEvent(new Event('close'));
 	});
 
 	constructor(url: string) {
+		console.log('constructor() called');
 		this.url = url;
 		// TODO deal with withCredentials?
 		setTimeout(() => {
@@ -66,7 +68,6 @@ class MockEventSource implements EventSource {
 	// dispatchEvent need return boolean
 	dispatchEvent(event: Event): boolean {
 		const listeners = this.eventListeners[event.type] || [];
-
 		listeners.forEach(listener => {
 			try {
 				listener(event);

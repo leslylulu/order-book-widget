@@ -157,7 +157,6 @@ export default function OrderBook() {
     eventSourceRef.current = eventSource;
 
     eventSource.onopen = () => {
-      console.log('connection to server opened');
       setConnected(true);
       setLoading(false);
       setReconnectCount(0);
@@ -220,6 +219,7 @@ export default function OrderBook() {
       
     {!connected && !loading && (
       <Alert
+        data-testid="reconnect-alert"
         severity={reconnectCount < MAX_RECONNECT_ATTEMPTS ? "warning" : "error"}
         sx={{ mb: 2 }}
       >
@@ -292,17 +292,17 @@ export default function OrderBook() {
                   <span>
                     {item?.price?.toFixed(4)}
                     {item.direction === PriceDirection.Up && (
-                      <ArrowDropUp sx={{ color: 'inherit', ml: 0.5 }} />
+                      <ArrowDropUp data-testid="ArrowDropUpIcon" sx={{ color: 'inherit', ml: 0.5 }} />
                     )}
                     {item.direction === PriceDirection.Down && (
-                      <ArrowDropDown sx={{ color: 'inherit', ml: 0.5 }} />
+                      <ArrowDropDown data-testid="ArrowDropDownIcon"  sx={{ color: 'inherit', ml: 0.5 }} />
                     )}
                   </span>
                 </BlinkingCell>
 
               </StyledTableRow>
             )) : <TableRow>
-                <TableCell colSpan={3} align="center">NoData</TableCell>
+                  <TableCell colSpan={3} align="center">No Recent Trades Available</TableCell>
               </TableRow>
           }
         </TableBody>

@@ -5,18 +5,21 @@ import OrderBook from "@/components/OrderBook";
 import MockEventSource from "@/__mocks__/MockEventSource";
 
 // replace any
-global.EventSource = MockEventSource as unknown as typeof EventSource;
 
-describe('OrderBook Comp', () => {
+
+describe('OrderBook Component', () => {
 	let mockEventSource: MockEventSource;
 
 	beforeEach(() => {
 		jest.useFakeTimers();
 
-		global.EventSource = jest.fn().mockImplementation((url) => {
+		const mockedES = jest.fn().mockImplementation((url: string) => {
 			mockEventSource = new MockEventSource(url);
 			return mockEventSource;
-		}) as any
+		}) as unknown as jest.MockInstance<MockEventSource, [string]> & typeof MockEventSource;
+
+		global.EventSource = mockedES ;
+		
 	});
 
 	afterEach(() => {
@@ -44,20 +47,79 @@ describe('OrderBook Comp', () => {
 		await act( async () => {
 			jest.advanceTimersByTime(50);
 			mockEventSource.onopen?.(new Event('open'));
+			mockEventSource.emitMessage({ price: 100.07703060864186 });
+			jest.runAllTimers();
 		});
-
-		await act(async () => {
-			mockEventSource.emitMessage({ price: 100.5021 });
-		})
 
 		await waitFor(() => {
 			const priceEl = screen.getByText((content, element) => {
-				return element.tagName.toLowerCase() === 'span' && content.includes('100.50');
+				return element.tagName.toLowerCase() === 'span' && content.includes('100.0770');
 			});
 			expect(priceEl).toBeInTheDocument();
-
-		}, { timeout: 5000});
-
-
+		}, { timeout: 1000});
 	})
+
+	test('show changed direction when price changes', async ()=> {
+		render(<OrderBook/>);
+		await act(async () => {
+			jest.advanceTimersByTime(50);
+			mockEventSource.onopen?.(new Event('open'));
+			mockEventSource.emitMessage({ price: 110.07703060864186 });
+			jest.runAllTimers();
+		});
+
+		await act(async () => {
+			mockEventSource.emitMessage({ price: 125.07703060864186 });
+			jest.runAllTimers();
+		});
+
+		await waitFor(() => {
+			const arrowUp = document.querySelector('svg[data-testid="ArrowDropUpIcon"]');
+			expect(arrowUp).toBeInTheDocument();
+		}, { timeout: 1000 });
+
+		await act(async () => {
+			mockEventSource.emitMessage({ price: 96.07703060864186 });
+			jest.runAllTimers();
+		});
+
+		await waitFor(() => {
+			const arrowDown = document.querySelector('svg[data-testid="ArrowDropDownIcon"]');
+			expect(arrowDown).toBeInTheDocument();
+		}, { timeout: 1000 });
+
+	});
+
+	// life cycle: open -> error -> reconnect -> new connection
+	test('attempts to reconnect', async() => {
+		jest.useFakeTimers();
+
+		render(<OrderBook/>)
+
+		await act(async () => {
+			jest.advanceTimersByTime(50)
+			mockEventSource.onopen?.(new Event('open'));
+			jest.runAllTimers();
+		})
+
+		expect(screen.queryByTestId('reconnect-alert')).not.toBeInTheDocument();
+
+		await act(async () => {
+			mockEventSource.onerror?.(new Event('error'))
+			jest.advanceTimersByTime(100);
+			jest.runAllTimers();
+		})
+
+
+		const reconnectAlert = screen.queryByTestId('reconnect-alert');
+		console.log('Alert element found:', !!reconnectAlert);
+
+		expect(global.EventSource).toHaveBeenCalledTimes(2);
+
+		expect(global.EventSource).toHaveBeenNthCalledWith(1, '/api/order-stream');
+		expect(global.EventSource).toHaveBeenNthCalledWith(2, '/api/order-stream');
+		
+	})
+
+
 })
