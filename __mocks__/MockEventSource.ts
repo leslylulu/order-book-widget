@@ -43,12 +43,8 @@ class MockEventSource {
 		console.log('constructor() called');
 		this.url = url;
 		// TODO deal with withCredentials?
-		setTimeout(() => {
-			this.readyState = this.OPEN;
-			if (this.onopen) {
-				this.onopen(new Event('open'));
-			}
-		}, 10)
+		
+		// manually control event 
 	}
 	
 	addEventListener(

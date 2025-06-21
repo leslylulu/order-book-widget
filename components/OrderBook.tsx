@@ -118,7 +118,7 @@ const BlinkingCell = styled(TableCell)`
 
 
 export default function OrderBook() {
-  const MAX_RECONNECT_ATTEMPTS = 10;
+  const MAX_RECONNECT_ATTEMPTS = 5;
 
   const [connected, setConnected] = useState(false);
   const [records, setRecords] = useState<PriceRecord[]>([]);
@@ -161,6 +161,7 @@ export default function OrderBook() {
       setLoading(false);
       setReconnectCount(0);
     };
+
     eventSource.onmessage = (event) => {
       try{
         const data = JSON.parse(event.data);
@@ -170,34 +171,39 @@ export default function OrderBook() {
         console.error('error parsing event data:', error);
       }
     }
+
     eventSource.onerror = (error) => {
       console.error('eventsource error:', error);
+      eventSource.close();
+      eventSourceRef.current = null;
       setConnected(false);
       setLoading(false);
-      eventSource.close();
-
-      if(!reconnectTimeoutRef.current) {
-        if(reconnectCount < MAX_RECONNECT_ATTEMPTS){
-          const nextAttempt = reconnectCount + 1;
-          setReconnectCount(nextAttempt);
-
-          const delay = Math.min(1000 * Math.pow(2, nextAttempt - 1), 30000);
-
-          reconnectTimeoutRef.current = setTimeout(() => {
-            console.log('reconnecting to server...');
-            reconnectTimeoutRef.current = null;
-            connect();
-          }, delay);
-        }
-        else{
-          console.error(`failed to reconnect after ${MAX_RECONNECT_ATTEMPTS} attempts!`);
-        }
-      }
+      setReconnectCount(prev => prev + 1);
     };
   }
 
   useEffect(() => {
-    
+    if(reconnectCount === 0 || connected) return;
+    if (reconnectCount <= MAX_RECONNECT_ATTEMPTS) {
+      const delay = 1000 * Math.pow(2, reconnectCount - 1);
+      reconnectTimeoutRef.current = setTimeout(() => {
+        reconnectTimeoutRef.current = null;
+        console.log('delay:', delay, reconnectCount)
+        connect();
+      }, delay);
+    } else {
+      console.error(`Maximum reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached!`);
+    }
+    return () => {
+      if(reconnectTimeoutRef.current){
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+    }
+
+  }, [reconnectCount, connected])
+
+  useEffect(() => {
     connect();
 
     return () => {
@@ -209,6 +215,11 @@ export default function OrderBook() {
   }, [])
 
 
+  console.log(`connected is ${connected}, loading is ${loading}, reconnectCount is ${reconnectCount}`)
+  // initial: connected = false, loading = true
+  // connect failed: connected = false, loading = false
+  // reconnecting: connected = false, loading = false
+  // max attempts: connected = false, loading  = false
   return <Paper 
     sx={{ 
       margin: 'auto',
@@ -216,8 +227,8 @@ export default function OrderBook() {
       borderRadius: '1rem',
       boxShadow: 0
     }}>
-      
-    {!connected && !loading && (
+    {!connected && reconnectCount > 0 && (
+    // {((!connected && !loading) || reconnectCount > 0) && (
       <Alert
         data-testid="reconnect-alert"
         severity={reconnectCount < MAX_RECONNECT_ATTEMPTS ? "warning" : "error"}

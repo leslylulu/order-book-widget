@@ -6,7 +6,6 @@ import MockEventSource from "@/__mocks__/MockEventSource";
 
 // replace any
 
-
 describe('OrderBook Component', () => {
 	let mockEventSource: MockEventSource;
 
@@ -18,7 +17,7 @@ describe('OrderBook Component', () => {
 			return mockEventSource;
 		}) as unknown as jest.MockInstance<MockEventSource, [string]> & typeof MockEventSource;
 
-		global.EventSource = mockedES ;
+		global.EventSource = mockedES;
 		
 	});
 
@@ -106,19 +105,53 @@ describe('OrderBook Component', () => {
 
 		await act(async () => {
 			mockEventSource.onerror?.(new Event('error'))
-			jest.advanceTimersByTime(100);
 			jest.runAllTimers();
 		})
 
+		await act(async () => {
+			jest.advanceTimersByTime(1000);
+			jest.runAllTimers();
+		});
 
-		const reconnectAlert = screen.queryByTestId('reconnect-alert');
-		console.log('Alert element found:', !!reconnectAlert);
+		const alert = screen.getByTestId('reconnect-alert');
+		expect(alert).toBeInTheDocument();
+		expect(alert).toHaveTextContent(/Attempting to reconnect/i);
 
 		expect(global.EventSource).toHaveBeenCalledTimes(2);
 
 		expect(global.EventSource).toHaveBeenNthCalledWith(1, '/api/order-stream');
 		expect(global.EventSource).toHaveBeenNthCalledWith(2, '/api/order-stream');
-		
+
+	})
+
+	test('reached the max attempts and show error alter', async () => {
+		jest.useFakeTimers();
+		const MAX_RECONNECT_ATTEMPTS = 5;
+
+		render(<OrderBook/>);
+
+		await act(async () => {
+			jest.advanceTimersByTime(50);
+			jest.runAllTimers();
+		})
+
+		for(let i = 0; i < MAX_RECONNECT_ATTEMPTS; i++){
+			await act(async () => {
+				// console.log(`Triggering error ${i + 1} of ${MAX_RECONNECT_ATTEMPTS}`);
+				mockEventSource.onerror?.(new Event('error'));
+				const delay = 1000 * Math.pow(2, i - 1);
+				jest.advanceTimersByTime(delay);
+				jest.runAllTimers();
+			})
+		}
+
+		await waitFor(() => {
+			const alertElement = screen.getByTestId('reconnect-alert');
+			expect(alertElement).toBeInTheDocument();
+			expect(alertElement).toHaveTextContent(/maximum reconnect attempts/i);
+		}, { timeout: 2000 });
+
+		expect(global.EventSource).toHaveBeenCalledTimes(MAX_RECONNECT_ATTEMPTS);
 	})
 
 
