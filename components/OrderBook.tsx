@@ -231,9 +231,13 @@ export default function OrderBook() {
     )}
 
     <Typography variant="subtitle1" gutterBottom>
-      Last Price: <strong>{loading ? <Skeleton sx={{
-        display: "inline-block"
-      }} width={80}/> : records[0]?.price?.toFixed(4) ?? '--'}</strong>
+      Last Price: <strong>{loading ? <Skeleton
+        data-testid="price-loading-skeleton" 
+        sx={{
+          display: "inline-block"
+        }} 
+        width={80}
+      /> : records[0]?.price?.toFixed(4) ?? '--'}</strong>
     </Typography>
     
     <TableContainer sx={{
@@ -252,9 +256,9 @@ export default function OrderBook() {
             loading ? (
               Array(10).fill(0).map((_, index) => (
                 <StyledTableRow key={`skeleton-${index}`}>
-                  <TableCell><Skeleton /></TableCell>
-                  <TableCell><Skeleton /></TableCell>
-                  <TableCell><Skeleton /></TableCell>
+                  <TableCell><Skeleton data-testid="skeleton-cell" /></TableCell>
+                  <TableCell><Skeleton data-testid="skeleton-cell" /></TableCell>
+                  <TableCell><Skeleton data-testid="skeleton-cell" /></TableCell>
                 </StyledTableRow>
               ))
             ) : records.length > 0 ? records.map((item, index) => (
@@ -286,7 +290,7 @@ export default function OrderBook() {
                   }}
                 >
                   <span>
-                    {item.price.toFixed(4)}
+                    {item?.price?.toFixed(4)}
                     {item.direction === PriceDirection.Up && (
                       <ArrowDropUp sx={{ color: 'inherit', ml: 0.5 }} />
                     )}
