@@ -188,7 +188,7 @@ export default function OrderBook() {
       const delay = 1000 * Math.pow(2, reconnectCount - 1);
       reconnectTimeoutRef.current = setTimeout(() => {
         reconnectTimeoutRef.current = null;
-        console.log('delay:', delay, reconnectCount)
+        // console.log('delay:', delay, reconnectCount)
         connect();
       }, delay);
     } else {
