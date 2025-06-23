@@ -56,7 +56,7 @@ const StyledTableRow = styled(TableRow)(({ theme }) => ({
   '&:hover': {
     backgroundColor: theme.palette.action.selected,
   },
-  '&:last-child td': {
+  'td': {
     borderBottom: 0
   },
   borderRadius: 8,
@@ -151,7 +151,12 @@ export default function OrderBook() {
     setRecords((prev) => {
       let direction: PriceDirection;
       let side: Side;
-      const now = new Date().toLocaleTimeString();
+      const now = new Date().toLocaleTimeString('en-US', {
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
       const lastPriceValue = prev[0]?.price ?? 0;
       if (prev.length === 0) {
         direction = PriceDirection.Same;
@@ -253,10 +258,10 @@ export default function OrderBook() {
 
   const getWaterMarkDisplay = (price: number) => {
     if(price >= highMark){
-      return <Chip label="High" color="success" sx={{borderRadius: '8px'}}  />;
+      return <Chip label="High" size="small" color="success" sx={{borderRadius: '8px'}}  />;
     }
     if(price <= lowMark){
-      return <Chip label="Low" color="error" sx={{ borderRadius: '8px' }} />;
+      return <Chip label="Low" size="small" color="error" sx={{ borderRadius: '8px' }} />;
     }
     return null
   }
@@ -270,7 +275,7 @@ export default function OrderBook() {
   return <Paper 
     sx={{ 
       margin: 'auto',
-      m: 4,
+      m: "24px",
       borderRadius: '1rem',
       boxShadow: 0
     }}>
