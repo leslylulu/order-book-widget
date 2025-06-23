@@ -37,7 +37,7 @@ describe('OrderBook Component', () => {
 		expect(screen.getByTestId('price-loading-skeleton')).toBeInTheDocument();
 
 		const skeletonCells = screen.getAllByTestId('skeleton-cell');
-		expect(skeletonCells.length).toBe(30);
+		expect(skeletonCells.length).toBe(40);
 		
 	});
 
@@ -51,10 +51,9 @@ describe('OrderBook Component', () => {
 		});
 
 		await waitFor(() => {
-			const priceEl = screen.getByText((content, element) => {
-				return element.tagName.toLowerCase() === 'span' && content.includes('100.0770');
-			});
+			const priceEl = screen.getByTestId('price-value');
 			expect(priceEl).toBeInTheDocument();
+			expect(priceEl.textContent).toContain('100.0770');
 		}, { timeout: 1000});
 	})
 

@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from "react";
-import { Paper, Alert, TableContainer, Typography, Table, TableBody, TableCell, TableHead, TableRow, Skeleton, alpha } from "@mui/material";
+import { Paper, Alert, Box, Card, CardContent, TableContainer, Typography, Table, TableBody, TableCell, TableHead, TableRow, Skeleton, Chip, alpha } from "@mui/material";
 import { tableCellClasses } from '@mui/material/TableCell';
 import { ArrowDropUp, ArrowDropDown } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
@@ -119,20 +119,36 @@ const BlinkingCell = styled(TableCell)`
 
 export default function OrderBook() {
   const MAX_RECONNECT_ATTEMPTS = 5;
+  const MAX_LENGTH = 20;
 
   const [connected, setConnected] = useState(false);
   const [records, setRecords] = useState<PriceRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [reconnectCount, setReconnectCount] = useState(0)
+  const [highMark, setHighMark] = useState<number>(0);
+  const [lowMark, setLowMark] = useState<number>(0);
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const recordPriceUpdate = (price: number) => {
-    const now = new Date().toLocaleTimeString();
+    setHighMark((prevHighMark) => {
+      if (prevHighMark == 0 || price > prevHighMark) {
+        return price;
+      }
+      return prevHighMark;
+    });
+
+    setLowMark((prevLowmark) => {
+      if (prevLowmark == 0 || price < prevLowmark) {
+        return price;
+      }
+      return prevLowmark;
+    })
+  
     setRecords((prev) => {
       let direction: PriceDirection;
       let side: Side;
-
+      const now = new Date().toLocaleTimeString();
       const lastPriceValue = prev[0]?.price ?? 0;
       if (prev.length === 0) {
         direction = PriceDirection.Same;
@@ -147,39 +163,43 @@ export default function OrderBook() {
         direction = PriceDirection.Same;
         side = Math.random() < 0.5 ? Side.Bid : Side.Ask;
       }
-      return [{ price, timestamp: now, side, direction }, ...prev].slice(0, 20);
+
+      return [{ price, timestamp: now, side, direction }, ...prev].slice(0, MAX_LENGTH);
     });
   }
 
   const connect = () => {
     setLoading(true);
-    const eventSource = new EventSource('/api/order-stream');
-    eventSourceRef.current = eventSource;
+    try{
+      const eventSource = new EventSource('/api/order-stream');
+      eventSourceRef.current = eventSource;
 
-    eventSource.onopen = () => {
-      setConnected(true);
-      setLoading(false);
-      setReconnectCount(0);
-    };
-
-    eventSource.onmessage = (event) => {
-      try{
-        const data = JSON.parse(event.data);
-        recordPriceUpdate(data.price);
+      eventSource.onopen = () => {
+        setConnected(true);
+        setLoading(false);
+        setReconnectCount(0);
+      };
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          recordPriceUpdate(data.price);
+        }
+        catch (error) {
+          console.error('error parsing event data:', error);
+        }
       }
-      catch (error) {
-        console.error('error parsing event data:', error);
-      }
-    }
 
-    eventSource.onerror = (error) => {
-      console.error('eventsource error:', error);
-      eventSource.close();
-      eventSourceRef.current = null;
-      setConnected(false);
-      setLoading(false);
+      eventSource.onerror = (error) => {
+        console.error('eventsource error:', error);
+        eventSource.close();
+        cleanupConnection();
+        setReconnectCount(prev => prev + 1);
+      };
+    }catch(error){
+      console.error('Failed to create EventSource:', error);
+      cleanupConnection();
       setReconnectCount(prev => prev + 1);
-    };
+    }
   }
 
   useEffect(() => {
@@ -188,7 +208,6 @@ export default function OrderBook() {
       const delay = 1000 * Math.pow(2, reconnectCount - 1);
       reconnectTimeoutRef.current = setTimeout(() => {
         reconnectTimeoutRef.current = null;
-        // console.log('delay:', delay, reconnectCount)
         connect();
       }, delay);
     } else {
@@ -203,6 +222,8 @@ export default function OrderBook() {
 
   }, [reconnectCount, connected])
 
+
+
   useEffect(() => {
     connect();
 
@@ -214,8 +235,27 @@ export default function OrderBook() {
     };
   }, [])
 
+  const cleanupConnection = () => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+    setConnected(false);
+    setLoading(false);
+  };
 
-  console.log(`connected is ${connected}, loading is ${loading}, reconnectCount is ${reconnectCount}`)
+  const getWaterMarkDisplay = (price: number) => {
+    if(price >= highMark){
+      return <Chip label="High" color="success" sx={{borderRadius: '8px'}}  />;
+    }
+    if(price <= lowMark){
+      return <Chip label="Low" color="error" sx={{ borderRadius: '8px' }} />;
+    }
+    return null
+  }
+
+  // console.log(`connected is ${connected}, loading is ${loading}, reconnectCount is ${reconnectCount}`)
+  // console.log('High', highMark, lowMark)
   // initial: connected = false, loading = true
   // connect failed: connected = false, loading = false
   // reconnecting: connected = false, loading = false
@@ -228,7 +268,6 @@ export default function OrderBook() {
       boxShadow: 0
     }}>
     {!connected && reconnectCount > 0 && (
-    // {((!connected && !loading) || reconnectCount > 0) && (
       <Alert
         data-testid="reconnect-alert"
         severity={reconnectCount < MAX_RECONNECT_ATTEMPTS ? "warning" : "error"}
@@ -241,15 +280,89 @@ export default function OrderBook() {
       </Alert>
     )}
 
-    <Typography variant="subtitle1" gutterBottom>
-      Last Price: <strong>{loading ? <Skeleton
-        data-testid="price-loading-skeleton" 
-        sx={{
-          display: "inline-block"
-        }} 
-        width={80}
-      /> : records[0]?.price?.toFixed(4) ?? '--'}</strong>
-    </Typography>
+    <Box sx={{ mb: 3 }}>
+      <Card elevation={2} sx={{
+        borderRadius: 2,
+        overflow: 'visible',
+        position: 'relative',
+        mb: 3,
+        boxShadow: '0px 1px 8px rgba(0, 0, 0, 0.2)',
+      }}>
+        <CardContent sx={{ pb: '16px !important' }}>
+          <Typography variant="h6" component="div" gutterBottom sx={{
+            fontWeight: 'bold',
+            color: records[0]?.direction === PriceDirection.Up
+              ? 'success.main'
+              : records[0]?.direction === PriceDirection.Down
+                ? 'error.main'
+                : 'text.primary'
+          }}>
+            {loading ? (
+              <Skeleton data-testid="price-loading-skeleton" width={120} sx={{ display: "inline-block" }} />
+            ) : (
+              <>
+                <span>
+                  {records[0]?.price?.toFixed(4) ?? '--'}
+                </span>
+                {records[0]?.direction === PriceDirection.Up &&
+                  <ArrowDropUp fontSize="small" sx={{ verticalAlign: 'middle', ml: 0.5 }} />
+                }
+                {records[0]?.direction === PriceDirection.Down &&
+                  <ArrowDropDown fontSize="small" sx={{ verticalAlign: 'middle', ml: 0.5 }} />
+                }
+              </>
+            )}
+          </Typography>
+
+          <Box sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            mt: 1.5
+          }}>
+            {
+              loading ? <Skeleton
+                width={120}
+                height={32}
+                variant="rounded"
+                sx={{ borderRadius: '16px' }}
+              /> : <Chip
+                icon={<ArrowDropUp />}
+                label={`High: ${highMark ? highMark.toFixed(4) : '--'}`}
+                color="success"
+                size="small"
+                variant="outlined"
+                sx={{
+                  fontWeight: 'medium',
+                  minWidth: '120px',
+                  '& .MuiChip-icon': { color: 'success.main' }
+                }}
+              />
+            }
+            {
+              loading ? <Skeleton
+                width={120}
+                height={32}
+                variant="rounded"
+                sx={{ borderRadius: '16px' }}
+              /> : <Chip
+                icon={<ArrowDropDown />}
+                label={`Low: ${lowMark ? lowMark.toFixed(4) : '--'}`}
+                color="error"
+                size="small"
+                variant="outlined"
+                sx={{
+                  fontWeight: 'medium',
+                  minWidth: '120px',
+                  '& .MuiChip-icon': { color: 'error.main' }
+                }}
+              />
+            }
+            
+          </Box>
+        </CardContent>
+      </Card>
+    </Box>
     
     <TableContainer sx={{
       boxShadow: '0px 3px 8px rgba(0, 0, 0, 0.1)',
@@ -260,6 +373,7 @@ export default function OrderBook() {
             <StyledTableCell>Time</StyledTableCell>
             <StyledTableCell>Type</StyledTableCell>
             <StyledTableCell>Price</StyledTableCell>
+            <StyledTableCell>Water Mark</StyledTableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -267,6 +381,7 @@ export default function OrderBook() {
             loading ? (
               Array(10).fill(0).map((_, index) => (
                 <StyledTableRow key={`skeleton-${index}`}>
+                  <TableCell><Skeleton data-testid="skeleton-cell" /></TableCell>
                   <TableCell><Skeleton data-testid="skeleton-cell" /></TableCell>
                   <TableCell><Skeleton data-testid="skeleton-cell" /></TableCell>
                   <TableCell><Skeleton data-testid="skeleton-cell" /></TableCell>
@@ -300,7 +415,7 @@ export default function OrderBook() {
                     fontWeight: item.direction !== PriceDirection.Same ? 'bold' : 'normal',
                   }}
                 >
-                  <span>
+                  <span data-testid="price-value">
                     {item?.price?.toFixed(4)}
                     {item.direction === PriceDirection.Up && (
                       <ArrowDropUp data-testid="ArrowDropUpIcon" sx={{ color: 'inherit', ml: 0.5 }} />
@@ -310,10 +425,12 @@ export default function OrderBook() {
                     )}
                   </span>
                 </BlinkingCell>
-
+                <TableCell>
+                  {getWaterMarkDisplay(item.price)}
+                </TableCell>
               </StyledTableRow>
             )) : <TableRow>
-                  <TableCell colSpan={3} align="center">No Recent Trades Available</TableCell>
+                  <TableCell colSpan={4} align="center">No Recent Trades Available</TableCell>
               </TableRow>
           }
         </TableBody>
