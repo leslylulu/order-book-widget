@@ -56,6 +56,9 @@ const StyledTableRow = styled(TableRow)(({ theme }) => ({
   '&:hover': {
     backgroundColor: theme.palette.action.selected,
   },
+  '&:last-child td': {
+    borderBottom: 0
+  },
   borderRadius: 8,
 }));
 
@@ -182,7 +185,12 @@ export default function OrderBook() {
       eventSource.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          recordPriceUpdate(data.price);
+          const price = data?.price;
+          if(price !== undefined && price !== null && !isNaN(Number(price))){
+            recordPriceUpdate(data.price || 0);
+          }else{
+            console.warn('Receviced invalid price data = ', data)
+          }
         }
         catch (error) {
           console.error('error parsing event data:', error);
@@ -288,89 +296,99 @@ export default function OrderBook() {
           sx={{
             display: 'flex',
             width: "100%",
-            padding: '1rem'
+            flexDirection: { xs: 'column', sm: 'row' }
           }}>
-          <Box sx={{
-            display: 'flex',
-            width: "30%",
-            flexDirection: "column",
-            alignItems: 'start',
-            justifyContent: "center"
-          }}>
-          <Typography variant="h3" component="div" gutterBottom sx={{
-            fontWeight: 'bold',
-            color: records[0]?.direction === PriceDirection.Up
-              ? 'success.main'
-              : records[0]?.direction === PriceDirection.Down
-                ? 'error.main'
-                : 'text.primary'
-          }}>
-            {loading ? (
-              <Skeleton data-testid="price-loading-skeleton" width={120} sx={{ display: "inline-block" }} />
-            ) : (
-              <>
-                <span>
-                  {records[0]?.price?.toFixed(4) ?? '--'}
-                </span>
-                {records[0]?.direction === PriceDirection.Up &&
-                  <ArrowDropUp fontSize="small" sx={{ verticalAlign: 'middle', ml: 0.5 }} />
-                }
-                {records[0]?.direction === PriceDirection.Down &&
-                  <ArrowDropDown fontSize="small" sx={{ verticalAlign: 'middle', ml: 0.5 }} />
-                }
-              </>
-            )}
-          </Typography>
+          <Box 
+            sx={{
+              display: 'flex',
+              width: { xs: '100%', sm: '30%' },
+              flexDirection: "column",
+              alignItems: 'start',
+              justifyContent: "center",
+              pt: '1rem',
+              pl: '1rem',
+            }}
+          >
+            <Typography variant="h4" component="div" gutterBottom sx={{
+              fontWeight: 'bold',
+              color: records[0]?.direction === PriceDirection.Up
+                ? 'success.main'
+                : records[0]?.direction === PriceDirection.Down
+                  ? 'error.main'
+                  : 'text.primary'
+            }}>
+              {loading ? (
+                <Skeleton data-testid="price-loading-skeleton" width={120} sx={{ display: "inline-block" }} />
+              ) : (
+                <>
+                  <span>
+                    {records[0]?.price?.toFixed(4) ?? '--'}
+                  </span>
+                  {records[0]?.direction === PriceDirection.Up &&
+                    <ArrowDropUp fontSize="small" sx={{ verticalAlign: 'middle', ml: 0.5 }} />
+                  }
+                  {records[0]?.direction === PriceDirection.Down &&
+                    <ArrowDropDown fontSize="small" sx={{ verticalAlign: 'middle', ml: 0.5 }} />
+                  }
+                </>
+              )}
+            </Typography>
 
-          <Box sx={{
-            display: 'flex',
-            flexDirection: "row",
-            alignItems: "center",
-            gap: '1rem',
-          }}>
-            {
-              loading ? <Skeleton
-                width={120}
-                height={32}
-                variant="rounded"
-                sx={{ borderRadius: '16px' }}
-              /> : <Chip
-                icon={<ArrowDropUp />}
-                label={`High: ${highMark ? highMark.toFixed(4) : '--'}`}
-                color="success"
-                size="small"
-                variant="outlined"
-                sx={{
-                  fontWeight: 'medium',
-                  minWidth: '120px',
-                  '& .MuiChip-icon': { color: 'success.main' }
-                }}
-              />
-            }
-            {
-              loading ? <Skeleton
-                width={120}
-                height={32}
-                variant="rounded"
-                sx={{ borderRadius: '16px' }}
-              /> : <Chip
-                icon={<ArrowDropDown />}
-                label={`Low: ${lowMark ? lowMark.toFixed(4) : '--'}`}
-                color="error"
-                size="small"
-                variant="outlined"
-                sx={{
-                  fontWeight: 'medium',
-                  minWidth: '120px',
-                  '& .MuiChip-icon': { color: 'error.main' }
-                }}
-              />
-            }
-            
-          </Box>
+            <Box sx={{
+              display: 'flex',
+              flexDirection: {sm: "column", md: "row"},
+              alignItems: "center",
+              gap: '1rem',
+            }}>
+              {
+                loading ? <Skeleton
+                  width={120}
+                  height={32}
+                  variant="rounded"
+                  sx={{ borderRadius: '16px' }}
+                /> : <Chip
+                  icon={<ArrowDropUp />}
+                  label={`High: ${highMark ? highMark.toFixed(4) : '--'}`}
+                  color="success"
+                  size="small"
+                  variant="outlined"
+                  sx={{
+                    fontWeight: 'medium',
+                    minWidth: '120px',
+                    '& .MuiChip-icon': { color: 'success.main' }
+                  }}
+                />
+              }
+              {
+                loading ? <Skeleton
+                  width={120}
+                  height={32}
+                  variant="rounded"
+                  sx={{ borderRadius: '16px' }}
+                /> : <Chip
+                  icon={<ArrowDropDown />}
+                  label={`Low: ${lowMark ? lowMark.toFixed(4) : '--'}`}
+                  color="error"
+                  size="small"
+                  variant="outlined"
+                  sx={{
+                    fontWeight: 'medium',
+                    minWidth: '120px',
+                    '& .MuiChip-icon': { color: 'error.main' }
+                  }}
+                />
+              }
+            </Box>
           </Box>
 
-          <Box sx={{ minHeight: 200, width: "70%", height: "100%", padding: '12px' }}>
+          <Box 
+            sx={{ 
+              minHeight: 200, 
+              height: "100%", 
+              width: { xs: '100%', sm: '70%' },
+              marginTop: {xs: '1rem', sm: 0},
+              }}
+            >
             {loading ? (
               <Skeleton variant="rectangular" height="100%" sx={{ borderRadius: 1 }} />
             ) : records.length > 1 ? (
@@ -385,18 +403,19 @@ export default function OrderBook() {
                   }}
                   sx={{
                     width: '100%',
-                    height: '100%',
+                    height: '200px',
                   }}
             />
             ) : (
               <Box
                 sx={{
-                  height: '100%',
+                  width: '100%',
+                  height: '200px',
                   display: 'flex',
+                  textAlign: 'center',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: '#f5f5f5',
-                  borderRadius: 1
+                  backgroundColor: '#f7f7f7',
                 }}
               >
                 <Typography variant="body2" color="text.secondary">
