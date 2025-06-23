@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useRef } from "react";
-import { Paper, Alert, Box, Card, CardContent, TableContainer, Typography, Table, TableBody, TableCell, TableHead, TableRow, Skeleton, Chip, alpha } from "@mui/material";
+import { SparkLineChart } from '@mui/x-charts/SparkLineChart';
+import { Paper, Alert, Box, Card, TableContainer, Typography, Table, TableBody, TableCell, TableHead, TableRow, Skeleton, Chip, alpha } from "@mui/material";
 import { tableCellClasses } from '@mui/material/TableCell';
 import { ArrowDropUp, ArrowDropDown } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
@@ -57,7 +58,6 @@ const StyledTableRow = styled(TableRow)(({ theme }) => ({
   },
   borderRadius: 8,
 }));
-
 
 interface SideTypeBadgeProps {
   side: Side;
@@ -223,7 +223,6 @@ export default function OrderBook() {
   }, [reconnectCount, connected])
 
 
-
   useEffect(() => {
     connect();
 
@@ -255,7 +254,7 @@ export default function OrderBook() {
   }
 
   // console.log(`connected is ${connected}, loading is ${loading}, reconnectCount is ${reconnectCount}`)
-  // console.log('High', highMark, lowMark)
+  // console.log('records ', records)
   // initial: connected = false, loading = true
   // connect failed: connected = false, loading = false
   // reconnecting: connected = false, loading = false
@@ -281,15 +280,24 @@ export default function OrderBook() {
     )}
 
     <Box sx={{ mb: 3 }}>
-      <Card elevation={2} sx={{
-        borderRadius: 2,
-        overflow: 'visible',
-        position: 'relative',
-        mb: 3,
+      <Card elevation={0} sx={{
+        borderRadius: 4,
         boxShadow: '0px 1px 8px rgba(0, 0, 0, 0.2)',
       }}>
-        <CardContent sx={{ pb: '16px !important' }}>
-          <Typography variant="h6" component="div" gutterBottom sx={{
+        <Box 
+          sx={{
+            display: 'flex',
+            width: "100%",
+            padding: '1rem'
+          }}>
+          <Box sx={{
+            display: 'flex',
+            width: "30%",
+            flexDirection: "column",
+            alignItems: 'start',
+            justifyContent: "center"
+          }}>
+          <Typography variant="h3" component="div" gutterBottom sx={{
             fontWeight: 'bold',
             color: records[0]?.direction === PriceDirection.Up
               ? 'success.main'
@@ -316,9 +324,9 @@ export default function OrderBook() {
 
           <Box sx={{
             display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            mt: 1.5
+            flexDirection: "row",
+            alignItems: "center",
+            gap: '1rem',
           }}>
             {
               loading ? <Skeleton
@@ -360,7 +368,44 @@ export default function OrderBook() {
             }
             
           </Box>
-        </CardContent>
+          </Box>
+
+          <Box sx={{ minHeight: 200, width: "70%", height: "100%", padding: '12px' }}>
+            {loading ? (
+              <Skeleton variant="rectangular" height="100%" sx={{ borderRadius: 1 }} />
+            ) : records.length > 1 ? (
+                <SparkLineChart
+                  data={[...records].reverse().map(r => r.price)}
+                  valueFormatter={(value) => value.toFixed(4)}
+                  showTooltip
+                  curve="monotoneX"
+                  yAxis={{ 
+                    min: records.length > 0 ? Math.min(...records.map(r => r.price)) * 0.9998 : undefined, 
+                    max: records.length > 0 ? Math.max(...records.map(r => r.price)) * 1.0002 : undefined
+                  }}
+                  sx={{
+                    width: '100%',
+                    height: '100%',
+                  }}
+            />
+            ) : (
+              <Box
+                sx={{
+                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: '#f5f5f5',
+                  borderRadius: 1
+                }}
+              >
+                <Typography variant="body2" color="text.secondary">
+                  Not enough data to display chart
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        </Box>
       </Card>
     </Box>
     
